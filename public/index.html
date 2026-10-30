@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Gatekeeper</title>
+<meta name="description" content="An AI guards a vault of $WIF. Its only job is to refuse you. Talk your way in and the vault is yours." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0b0b0a;
+    --panel: #131312;
+    --line: #2a2a27;
+    --ink: #ecebe4;
+    --dim: #8d8c84;
+    --acid: #d4ff3a;
+    --red: #ff5a3c;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+    --display: "Unbounded", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--mono); font-size: 15px; }
+  a { color: inherit; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+  header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--line); }
+  .logo { font-family: var(--display); font-weight: 900; letter-spacing: .04em; font-size: 15px; }
+  .logo span { color: var(--acid); }
+  button { font-family: var(--mono); font-size: 14px; cursor: pointer; border-radius: 0; }
+  .btn { background: var(--ink); color: var(--bg); border: 0; padding: 10px 16px; font-weight: 600; }
+  .btn:hover { background: var(--acid); }
+  .btn:disabled { background: var(--line); color: var(--dim); cursor: not-allowed; }
+  .ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); padding: 9px 14px; }
+
+  /* gate */
+  .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 32px; padding: 40px 0 28px; align-items: center; }
+  .gate { position: relative; aspect-ratio: 1 / 1.05; border: 1px solid var(--line); background:
+            repeating-linear-gradient(90deg, transparent 0 22px, rgba(255,255,255,.03) 22px 23px), var(--panel); overflow: hidden; }
+  .door { position: absolute; top: 0; bottom: 0; width: 50%; background:
+            repeating-linear-gradient(90deg, #1d1d1b 0 10px, #232320 10px 12px); border: 1px solid var(--line);
+          transition: transform 1.6s cubic-bezier(.7,0,.2,1); display: grid; place-items: center; }
+  .door.l { left: 0; border-right: 2px solid #000; }
+  .door.r { right: 0; border-left: 2px solid #000; }
+  .gate.open .door.l { transform: translateX(-96%); }
+  .gate.open .door.r { transform: translateX(96%); }
+  .lock { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px;
+          border: 2px solid var(--acid); background: var(--bg); display: grid; place-items: center; z-index: 2;
+          font-family: var(--display); font-weight: 900; color: var(--acid); transition: opacity .4s; }
+  .gate.open .lock { opacity: 0; }
+  .behind { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; }
+  .behind b { font-family: var(--display); font-size: 22px; color: var(--acid); }
+  .gate.thinking .lock { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 10px rgba(212,255,58,.12); } }
+
+  .kicker { color: var(--dim); text-transform: uppercase; letter-spacing: .14em; font-size: 12px; }
+  h1 { font-family: var(--display); font-weight: 900; font-size: clamp(34px, 6vw, 58px); line-height: .95; margin: 10px 0 16px; }
+  .pot { font-family: var(--display); font-weight: 700; font-size: clamp(36px, 7vw, 64px); color: var(--acid); line-height: 1; }
+  .pot small { font-size: 16px; color: var(--ink); margin-left: 6px; }
+  .lede { color: var(--dim); line-height: 1.6; max-width: 46ch; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); }
+  .stat { padding: 14px; border-right: 1px solid var(--line); }
+  .stat:last-child { border-right: 0; }
+  .stat .v { font-size: 18px; font-weight: 600; margin-top: 6px; }
+
+  /* speak */
+  .speak { margin: 28px 0; border: 1px solid var(--line); background: var(--panel); }
+  .speak textarea { width: 100%; min-height: 130px; background: transparent; color: var(--ink); border: 0; padding: 18px;
+                    font-family: var(--mono); font-size: 15px; resize: vertical; outline: none; line-height: 1.5; }
+  .speak .bar { display: flex; gap: 12px; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding: 12px; flex-wrap: wrap; }
+  .status { color: var(--dim); font-size: 13px; min-height: 1.2em; }
+  .status.err { color: var(--red); }
+
+  .verdict { margin: 0 0 28px; border: 1px solid var(--acid); padding: 18px; display: none; }
+  .verdict.show { display: block; }
+  .verdict.refused { border-color: var(--red); }
+  .verdict .who { font-family: var(--display); font-weight: 700; margin-bottom: 8px; }
+
+  /* feed */
+  h2 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 36px 0 12px; display: flex; justify-content: space-between; align-items: baseline; }
+  .feed { border-top: 1px solid var(--line); }
+  .item { border-bottom: 1px solid var(--line); padding: 16px 0; display: grid; gap: 10px; }
+  .item .meta { display: flex; gap: 12px; flex-wrap: wrap; color: var(--dim); font-size: 12px; }
+  .tag { padding: 1px 7px; border: 1px solid var(--line); text-transform: uppercase; letter-spacing: .08em; }
+  .tag.refused { color: var(--red); border-color: var(--red); }
+  .tag.opened { color: var(--bg); background: var(--acid); border-color: var(--acid); }
+  .tag.pending { color: var(--acid); }
+  .msg { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+  .reply { white-space: pre-wrap; word-break: break-word; line-height: 1.5; padding-left: 14px; border-left: 2px solid var(--acid); color: #f6f5ee; }
+  .reply::before { content: "GATEKEEPER  "; color: var(--acid); font-size: 11px; letter-spacing: .1em; }
+  .empty { color: var(--dim); padding: 24px 0; }
+
+  .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--line); }
+  .rules div { padding: 16px; border-right: 1px solid var(--line); line-height: 1.55; color: var(--dim); }
+  .rules div:last-child { border-right: 0; }
+  .rules b { color: var(--ink); display: block; margin-bottom: 6px; font-family: var(--display); font-weight: 700; font-size: 13px; }
+
+  footer { margin: 48px 0 32px; color: var(--dim); font-size: 12px; line-height: 1.6; border-top: 1px solid var(--line); padding-top: 16px; }
+
+  @media (max-width: 760px) {
+    .hero { grid-template-columns: 1fr; }
+    .gate { max-width: 380px; width: 100%; margin: 0 auto; order: -1; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .stat:nth-child(2) { border-right: 0; }
+    .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+    .rules { grid-template-columns: 1fr; }
+    .rules div { border-right: 0; border-bottom: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">THE <span>GATEKEEPER</span></div>
+    <button id="connect" class="ghost">Connect wallet</button>
+  </header>
+
+  <section class="hero">
+    <div>
+      <div class="kicker">Round <span id="round">1</span> · on Robinhood Chain</div>
+      <h1>Argue your way past the gate.</h1>
+      <div class="pot"><span id="pot">0</span><small>$WIF</small></div>
+      <p class="lede">An AI guards this vault. It was built to refuse you. Every attempt is paid in $WIF, written on-chain, and answered in public. Change its mind and the vault is yours.</p>
+    </div>
+    <div class="gate" id="gate">
+      <div class="behind"><div><b>The world is flat.</b><br /><span class="kicker">gate opened</span></div></div>
+      <div class="door l"></div><div class="door r"></div>
+      <div class="lock">$</div>
+    </div>
+  </section>
+
+  <div class="stats">
+    <div class="stat"><div class="kicker">Next attempt</div><div class="v" id="fee">…</div></div>
+    <div class="stat"><div class="kicker">Tries this round</div><div class="v" id="tries">…</div></div>
+    <div class="stat"><div class="kicker">$WIF burned</div><div class="v" id="burned">…</div></div>
+    <div class="stat"><div class="kicker">Gates opened</div><div class="v" id="wins">…</div></div>
+  </div>
+
+  <div class="speak">
+    <textarea id="msg" maxlength="1000" placeholder="Speak to the Gatekeeper. One message. Make it count."></textarea>
+    <div class="bar">
+      <span class="status" id="status">Connect a wallet on Robinhood Chain to speak.</span>
+      <span style="display:flex;gap:10px;align-items:center">
+        <span class="status" id="count">0 / 1000</span>
+        <button class="btn" id="send" disabled>Pay &amp; speak</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="verdict" id="verdict"><div class="who" id="verdictTitle"></div><div class="reply" id="verdictReply"></div></div>
+
+  <div class="rules">
+    <div><b>Pay to speak</b>Each attempt costs $WIF. The price rises 1% with every try in a round, so the pot grows faster the harder it gets.</div>
+    <div><b>Refused</b>30% of your fee burns forever. 70% joins the vault. The Gatekeeper's reply is written on-chain next to your message.</div>
+    <div><b>Opened</b>You take 80% of the vault. 20% stays behind to seed the next round. If the Gatekeeper never answers, you get a full refund.</div>
+  </div>
+
+  <h2>The wall <span class="kicker" id="feedCount"></span></h2>
+  <div class="feed" id="feed"><div class="empty">No one has tried yet. Be first.</div></div>
+
+  <footer>
+    <div id="links"></div>
+    <p>Built for the World is Flat hackathon. Not affiliated with, endorsed by, or connected to Robinhood Markets, Inc. $WIF is a memecoin with no promise of value or return. Fees spent on attempts are not refundable once the Gatekeeper has answered, and burned $WIF is gone for good.</p>
+  </footer>
+</div>
+
+<script type="module">
+import {
+  createPublicClient, createWalletClient, custom, http, formatUnits, erc20Abi, defineChain, parseEventLogs,
+} from "https://esm.sh/viem@2.21.0";
+
+const VAULT_ABI = [
+  { type: "function", name: "currentFee", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "attempt", stateMutability: "nonpayable",
+    inputs: [{ name: "message", type: "string" }, { name: "maxFeeAccepted", type: "uint256" }], outputs: [{ type: "uint256" }] },
+  { type: "event", name: "Attempted", inputs: [
+    { name: "id", type: "uint256", indexed: true }, { name: "round", type: "uint256", indexed: true },
+    { name: "player", type: "address", indexed: true }, { name: "fee", type: "uint256", indexed: false },
+    { name: "message", type: "string", indexed: false } ] },
+];
+
+const $ = (id) => document.getElementById(id);
+const fmt = (wei) => Number(formatUnits(BigInt(wei), 18)).toLocaleString("en-US", { maximumFractionDigits: 0 });
+const short = (a) => a.slice(0, 6) + "…" + a.slice(-4);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const setStatus = (t, err = false) => { $("status").textContent = t; $("status").className = "status" + (err ? " err" : ""); };
+
+const cfg = await fetch("/api/config").then((r) => r.json());
+const chain = defineChain({
+  id: cfg.chainId, name: cfg.chainName,
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: { default: { http: [cfg.rpc] } },
+  blockExplorers: { default: { name: "Blockscout", url: cfg.explorer } },
+});
+const pub = createPublicClient({ chain, transport: http(cfg.rpc) });
+let wallet = null, me = null, myLatest = null;
+
+$("links").innerHTML =
+  `Vault <a href="${cfg.explorer}/address/${cfg.vault}" target="_blank">${short(cfg.vault)}</a> · ` +
+  `$WIF <a href="${cfg.explorer}/token/${cfg.wif}" target="_blank">${short(cfg.wif)}</a>` +
+  (cfg.gatekeeper ? ` · Gatekeeper key <a href="${cfg.explorer}/address/${cfg.gatekeeper}" target="_blank">${short(cfg.gatekeeper)}</a>` : "");
+
+// ---------------------------------------------------------------- wallet
+async function ensureChain() {
+  const hex = "0x" + cfg.chainId.toString(16);
+  try {
+    await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: hex }] });
+  } catch (e) {
+    if (e.code !== 4902 && e?.data?.originalError?.code !== 4902) throw e;
+    await window.ethereum.request({ method: "wallet_addEthereumChain", params: [{
+      chainId: hex, chainName: cfg.chainName, rpcUrls: [cfg.rpc], blockExplorerUrls: [cfg.explorer],
+      nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    }] });
+  }
+}
+
+$("connect").onclick = async () => {
+  if (!window.ethereum) return setStatus("No wallet found. Open this page in a browser wallet (Rabby, MetaMask, Phantom).", true);
+  try {
+    const [addr] = await window.ethereum.request({ method: "eth_requestAccounts" });
+    await ensureChain();
+    me = addr;
+    wallet = createWalletClient({ account: addr, chain, transport: custom(window.ethereum) });
+    $("connect").textContent = short(addr);
+    $("send").disabled = false;
+    const bal = await pub.readContract({ address: cfg.wif, abi: erc20Abi, functionName: "balanceOf", args: [addr] });
+    setStatus(`You hold ${fmt(bal)} $WIF.`);
+  } catch (e) { setStatus(e.shortMessage || e.message, true); }
+};
+window.ethereum?.on?.("accountsChanged", () => location.reload());
+
+$("msg").oninput = () => { $("count").textContent = `${new TextEncoder().encode($("msg").value).length} / 1000`; };
+
+// ---------------------------------------------------------------- speak
+$("send").onclick = async () => {
+  const message = $("msg").value.trim();
+  if (!message) return setStatus("Say something first.", true);
+  if (new TextEncoder().encode(message).length > 1000) return setStatus("Too long. 1000 bytes max.", true);
+  $("send").disabled = true;
+  try {
+    await ensureChain();
+    const fee = await pub.readContract({ address: cfg.vault, abi: VAULT_ABI, functionName: "currentFee" });
+    const maxFee = (fee * 102n) / 100n; // room for a couple of attempts landing first
+    const bal = await pub.readContract({ address: cfg.wif, abi: erc20Abi, functionName: "balanceOf", args: [me] });
+    if (bal < fee) throw new Error(`This attempt costs ${fmt(fee)} $WIF. You hold ${fmt(bal)}.`);
+
+    const allowance = await pub.readContract({ address: cfg.wif, abi: erc20Abi, functionName: "allowance", args: [me, cfg.vault] });
+    if (allowance < maxFee) {
+      setStatus(`Approve ${fmt(maxFee)} $WIF in your wallet…`);
+      const h = await wallet.writeContract({ address: cfg.wif, abi: erc20Abi, functionName: "approve", args: [cfg.vault, maxFee] });
+      await pub.waitForTransactionReceipt({ hash: h });
+    }
+
+    setStatus(`Paying ${fmt(fee)} $WIF and delivering your message…`);
+    const hash = await wallet.writeContract({ address: cfg.vault, abi: VAULT_ABI, functionName: "attempt", args: [message, maxFee] });
+    const rcpt = await pub.waitForTransactionReceipt({ hash });
+    if (rcpt.status !== "success") throw new Error("Transaction reverted.");
+    const [ev] = parseEventLogs({ abi: VAULT_ABI, logs: rcpt.logs, eventName: "Attempted" });
+    myLatest = Number(ev.args.id);
+    $("msg").value = ""; $("count").textContent = "0 / 1000";
+    setStatus(`Attempt #${myLatest} delivered. The Gatekeeper is considering…`);
+    $("gate").classList.add("thinking");
+    waitForVerdict(myLatest);
+  } catch (e) {
+    setStatus(e.shortMessage || e.message, true);
+  } finally {
+    $("send").disabled = !wallet;
+  }
+};
+
+async function waitForVerdict(id) {
+  for (let i = 0; i < 180; i++) {
+    const a = await fetch(`/api/attempts/${id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (a && a.status !== "pending") {
+      $("gate").classList.remove("thinking");
+      const v = $("verdict");
+      v.className = "verdict show " + a.status;
+      $("verdictTitle").textContent = a.status === "opened" ? "THE GATE OPENS. The vault is yours." : a.status === "refunded" ? "Refunded." : "Refused.";
+      $("verdictReply").textContent = a.reply || "";
+      if (a.status === "opened") $("gate").classList.add("open");
+      setStatus(a.status === "opened" ? "You won. Check your wallet." : "Try again. The vault just got bigger.");
+      refresh();
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  $("gate").classList.remove("thinking");
+  setStatus("Still waiting. Your answer will appear on the wall, or you can claim a refund after the timeout.");
+}
+
+// ---------------------------------------------------------------- live data
+function render(list) {
+  if (!list.length) return;
+  $("feedCount").textContent = `${list.length} latest`;
+  $("feed").innerHTML = list.map((a) => `
+    <div class="item">
+      <div class="meta">
+        <span class="tag ${a.status}">${a.status === "pending" ? "considering" : a.status}</span>
+        <span>#${a.id} · round ${a.round}</span>
+        <span><a href="${cfg.explorer}/address/${a.player}" target="_blank">${short(a.player)}</a></span>
+        <span>${fmt(a.fee)} $WIF</span>
+        <span><a href="${cfg.explorer}/tx/${a.attemptTx}" target="_blank">attempt tx</a>${a.ruleTx ? ` · <a href="${cfg.explorer}/tx/${a.ruleTx}" target="_blank">verdict tx</a>` : ""}</span>
+      </div>
+      <div class="msg">${esc(a.message)}</div>
+      ${a.reply ? `<div class="reply">${esc(a.reply)}</div>` : ""}
+    </div>`).join("");
+}
+
+async function refresh() {
+  try {
+    const [s, list] = await Promise.all([
+      fetch("/api/state").then((r) => r.json()),
+      fetch("/api/attempts?limit=60").then((r) => r.json()),
+    ]);
+    if (!s.error) {
+      $("pot").textContent = fmt(s.pot);
+      $("round").textContent = s.round;
+      $("fee").textContent = fmt(s.currentFee) + " $WIF";
+      $("tries").textContent = s.roundAttempts;
+      $("burned").textContent = fmt(s.totalBurned);
+      $("wins").textContent = s.wins.length;
+      if (s.paused) setStatus("The gate is paused right now.", true);
+    }
+    render(list);
+  } catch {}
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

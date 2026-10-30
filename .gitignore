@@ -1,0 +1,4 @@
+node_modules/
+.env
+artifacts/
+scripts/rule.mjs
