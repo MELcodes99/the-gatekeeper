@@ -221,6 +221,11 @@ async function loop() {
 
 // ------------------------------------------------------------------ http
 const app = express();
+app.use((_req, res, next) => {
+  res.set("Access-Control-Allow-Origin", "*"); // public read-only API, safe for any frontend
+  res.set("Access-Control-Allow-Methods", "GET");
+  next();
+});
 app.use(express.static(new URL("../public", import.meta.url).pathname));
 
 app.get("/health", (_req, res) => res.json({ ok: true, lastBlock: lastBlock.toString(), attempts: attempts.size }));
